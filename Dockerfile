@@ -9,6 +9,7 @@
 # #
 # #
 
+
 FROM docker.io/library/node:14-alpine@sha256:dc92f36e7cd917816fa2df041d4e9081453366381a00f40398d99e9392e78664 AS build_node_modules
 
 # Copy Web UI
@@ -16,10 +17,19 @@ COPY src/ /app/
 WORKDIR /app
 RUN npm ci --production
 
+FROM golang:1.20-alpine AS build_metrics_exporter
+WORKDIR /app
+COPY WireguardMetricsExporter/go.mod WireguardMetricsExporter/go.sum ./
+RUN go mod download
+
+COPY WireguardMetricsExporter/*.go ./
+RUN CGO_ENABLED=0 GOOS=linux go build -o /wg_metrics_exporter
+
 # Copy build result to a new image.
 # This saves a lot of disk space.
 FROM docker.io/library/node:14-alpine@sha256:dc92f36e7cd917816fa2df041d4e9081453366381a00f40398d99e9392e78664
 COPY --from=build_node_modules /app /app
+COPY --from=build_metrics_exporter /wg_metrics_exporter /app
 
 # Move node_modules one directory up, so during development
 # we don't have to mount it in a volume.
@@ -35,8 +45,32 @@ RUN npm i -g nodemon
 
 # Install Linux packages
 RUN apk add -U --no-cache \
-  wireguard-tools \
-  dumb-init
+  wireguard-tools
+
+ENV S6_OVERLAY_VERSION=3.1.5.0
+
+# Install supervisor
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-noarch.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-noarch.tar.xz
+ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLAY_VERSION}/s6-overlay-x86_64.tar.xz /tmp
+RUN tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz
+
+#Create s6-overlay configuration to run wireguard with ui and metrics exporter
+
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/node_server/dependencies.d
+RUN mkdir -p /etc/s6-overlay/s6-rc.d/metrics_exporter/dependencies.d
+RUN echo "longrun" > /etc/s6-overlay/s6-rc.d/metrics_exporter/type
+RUN echo "longrun" > /etc/s6-overlay/s6-rc.d/node_server/type
+COPY run_node_js /etc/s6-overlay/s6-rc.d/node_server/run
+RUN chmod +x /etc/s6-overlay/s6-rc.d/node_server/run && \
+    touch /etc/s6-overlay/s6-rc.d/node_server/dependencies.d/base
+COPY run_metrics /etc/s6-overlay/s6-rc.d/metrics_exporter/run
+RUN chmod +x /etc/s6-overlay/s6-rc.d/metrics_exporter/run && \
+    touch /etc/s6-overlay/s6-rc.d/metrics_exporter/dependencies.d/node_server && \
+    touch /etc/s6-overlay/s6-rc.d/metrics_exporter/dependencies.d/base
+RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/node_server && \
+    touch /etc/s6-overlay/s6-rc.d/user/contents.d/metrics_exporter
+    
 
 # Expose Ports
 EXPOSE 51820/udp
@@ -47,4 +81,5 @@ ENV DEBUG=Server,WireGuard
 
 # Run Web UI
 WORKDIR /app
-CMD ["/usr/bin/dumb-init", "node", "server.js"]
+
+ENTRYPOINT ["/init"]

@@ -1,0 +1,3 @@
+#!/command/execlineb -P
+with-contenv
+/app/wg_metrics_exporter
