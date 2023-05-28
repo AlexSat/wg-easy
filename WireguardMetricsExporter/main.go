@@ -8,6 +8,7 @@ import (
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/exec"
@@ -22,19 +23,26 @@ type clientMetrics struct {
 	ReceivedBytes, SendBytes                   int64
 }
 
+const (
+	SUBSYSTEM = "wireguard"
+)
+
 var ReceivedBytes = promauto.NewGaugeVec(prometheus.GaugeOpts{
-	Name: "received_bytes_gauge",
-	Help: "Amount of bytes received by client",
+	Name:      "received_bytes_gauge",
+	Help:      "Amount of bytes received by client",
+	Subsystem: SUBSYSTEM,
 }, []string{"client_name"})
 
 var SendBytes = promauto.NewGaugeVec(prometheus.GaugeOpts{
-	Name: "send_bytes_gauge",
-	Help: "Amount of bytes send by client",
+	Name:      "send_bytes_gauge",
+	Help:      "Amount of bytes send by client",
+	Subsystem: SUBSYSTEM,
 }, []string{"client_name"})
 
 var LastHandshakeTimestamp = promauto.NewGaugeVec(prometheus.GaugeOpts{
-	Name: "last_handshake_unixtimestamp",
-	Help: "Date time in unixtimestamp seconds when last handshake activity registered",
+	Name:      "last_handshake_unixtimestamp",
+	Help:      "Date time in unixtimestamp seconds when last handshake activity registered",
+	Subsystem: SUBSYSTEM,
 }, []string{"client_name"})
 
 func GetAndServeTestMetric() {
@@ -87,7 +95,12 @@ func GetAndServeTestMetric() {
 		var data interface{}
 		plan, err := os.ReadFile("/etc/wireguard/wg0.json")
 		if err != nil {
-			fmt.Println(err)
+			switch err.(type) {
+			case *fs.PathError:
+				break
+			default:
+				fmt.Println(err)
+			}
 			continue
 		}
 		err = json.Unmarshal(plan, &data)

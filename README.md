@@ -1,26 +1,21 @@
 # WireGuard Easy
 
-[![Build & Publish Docker Image to Docker Hub](https://github.com/WeeJeWel/wg-easy/actions/workflows/deploy.yml/badge.svg?branch=production)](https://github.com/WeeJeWel/wg-easy/actions/workflows/deploy.yml)
-[![Lint](https://github.com/WeeJeWel/wg-easy/actions/workflows/lint.yml/badge.svg?branch=master)](https://github.com/WeeJeWel/wg-easy/actions/workflows/lint.yml)
-[![Docker](https://img.shields.io/docker/v/weejewel/wg-easy/latest)](https://hub.docker.com/r/weejewel/wg-easy)
-[![Docker](https://img.shields.io/docker/pulls/weejewel/wg-easy.svg)](https://hub.docker.com/r/weejewel/wg-easy)
-[![Sponsor](https://img.shields.io/github/sponsors/weejewel)](https://github.com/sponsors/WeeJeWel)
-![GitHub Stars](https://img.shields.io/github/stars/weejewel/wg-easy)
-
 You have found the easiest way to install & manage WireGuard on any Linux host!
 
 <p align="center">
   <img src="./assets/screenshot.png" width="802" />
+  <img src="./assets/grafana.png" width="802" />
 </p>
+
 
 ## Features
 
-* All-in-one: WireGuard + Web UI.
+* All-in-one: WireGuard + Web UI + Moonitoring (Prometheus + Grafana).
 * Easy installation, simple to use.
 * List, create, edit, delete, enable & disable clients.
 * Show a client's QR code.
 * Download a client's configuration file.
-* Statistics for which clients are connected.
+* Statistics for which clients are connected (Web UI admin + Grafana).
 * Tx/Rx charts for each connected client.
 * Gravatar support.
 
@@ -43,50 +38,31 @@ $ exit
 
 And log in again.
 
-### 2. Run WireGuard Easy
+### 2. Run WireGuard Easy with docker compose
 
-To automatically install & run wg-easy, simply run:
+Replace environment variables in `docker-compose.yml` and start it with `docker compose up -d`
 
-<pre>
-$ docker run -d \
-  --name=wg-easy \
-  -e WG_HOST=<b>🚨YOUR_SERVER_IP</b> \
-  -e PASSWORD=<b>🚨YOUR_ADMIN_PASSWORD</b> \
-  -v ~/.wg-easy:/etc/wireguard \
-  -p 51820:51820/udp \
-  -p 51821:51821/tcp \
-  --cap-add=NET_ADMIN \
-  --cap-add=SYS_MODULE \
-  --sysctl="net.ipv4.conf.all.src_valid_mark=1" \
-  --sysctl="net.ipv4.ip_forward=1" \
-  --restart unless-stopped \
-  weejewel/wg-easy
-</pre>
+The Web UI admin for Wireguard will now be available on `http://0.0.0.0:51821`.
+The Web monitoring (Grafana) for Wireguard will now be available on `http://0.0.0.0:3000` (`login`:`pass` is `admin`:`admin`).
 
-> 💡 Replace `YOUR_SERVER_IP` with your WAN IP, or a Dynamic DNS hostname.
-> 
-> 💡 Replace `YOUR_ADMIN_PASSWORD` with a password to log in on the Web UI.
-
-The Web UI will now be available on `http://0.0.0.0:51821`.
-
-> 💡 Your configuration files will be saved in `~/.wg-easy`
+> 💡 Your configuration files will be saved in `~/wireguard`, `~/prometheus` and `./grafana`
 
 ### 3. Sponsor
 
-Are you enjoying this project? [Buy me a beer!](https://github.com/sponsors/WeeJeWel) 🍻
+Are you enjoying this project? [Buy him a beer!](https://github.com/sponsors/WeeJeWel) 🍻
 
 ## Options
 
-These options can be configured by setting environment variables using `-e KEY="VALUE"` in the `docker run` command.
+These options can be configured by setting environment variables using `-e KEY="VALUE"` in the `docker run` command. (BE CAREFULLY AND CHECK ENVIRONMENT VARIABLES IN `docker-compose.yml`)
 
 | Env | Default | Example | Description |
 | - | - | - | - |
-| `PASSWORD` | - | `foobar123` | When set, requires a password when logging in to the Web UI. |
+| `PASSWORD` | `p123123` | `foobar123` | When set, requires a password when logging in to the Web UI. |
 | `WG_HOST` | - | `vpn.myserver.com` | The public hostname of your VPN server. |
 | `WG_DEVICE` | `eth0` | `ens6f0` | Ethernet device the wireguard traffic should be forwarded through. |
 | `WG_PORT` | `51820` | `12345` | The public UDP port of your VPN server. WireGuard will always listen on `51820` inside the Docker container. |
 | `WG_MTU` | `null` | `1420` | The MTU the clients will use. Server uses default WG MTU. |
-| `WG_PERSISTENT_KEEPALIVE` | `0` | `25` | Value in seconds to keep the "connection" open. If this value is 0, then connections won't be kept alive. |
+| `WG_PERSISTENT_KEEPALIVE` | `30` | `0` | Value in seconds to keep the "connection" open. If this value is 0, then connections won't be kept alive. |
 | `WG_DEFAULT_ADDRESS` | `10.8.0.x` | `10.6.0.x` | Clients IP address range. |
 | `WG_DEFAULT_DNS` | `1.1.1.1` | `8.8.8.8, 8.8.4.4` | DNS server clients will use. |
 | `WG_ALLOWED_IPS` | `0.0.0.0/0, ::/0` | `192.168.15.0/24, 10.0.1.0/24` | Allowed IPs clients will use. |
@@ -102,12 +78,10 @@ These options can be configured by setting environment variables using `-e KEY="
 To update to the latest version, simply run:
 
 ```bash
-docker stop wg-easy
-docker rm wg-easy
-docker pull weejewel/wg-easy
+docker compose down
+docker composse pull
+docker compose up -d
 ```
-
-And then run the `docker run -d \ ...` command above again.
 
 ## Common Use Cases
 
