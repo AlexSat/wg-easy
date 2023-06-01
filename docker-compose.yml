@@ -8,8 +8,9 @@ services:
       - "51821:51821"
     restart: unless-stopped
     hostname: wireguard
+    user: root
     environment:
-      - WG_HOST=${WGEASY_SERVER_HOST:-127.0.0.1}
+      - WG_HOST=${WGEASY_SERVER_HOST:-192.168.0.10}
       - PASSWORD=${WGEASY_ADMIN_PASSWORD:-p123123}
       - WG_PORT=${WGEASY_PORT:-51820}
       - WG_PERSISTENT_KEEPALIVE=30
@@ -22,15 +23,23 @@ services:
       - net.ipv4.conf.all.src_valid_mark=1
     volumes:
       - ./wireguard:/etc/wireguard
+      #To use this volume, you should create folder ./logs and make permissions 777 to it
+      #- ./logs/:/var/log/
 
   prometheus:
     image: prom/prometheus:latest
     volumes:
       - ./prometheus:/etc/prometheus/
+      - ./prometheus_data:/prometheus
     container_name: prometheus
     hostname: prometheus
     command:
-      - --config.file=/etc/prometheus/prometheus.yml
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=180d'
+      - '--web.enable-lifecycle'
     #No need to open port of prometheus. It used internally by Grafana without auth.
     #ports:
     #  - 9090:9090
@@ -46,7 +55,7 @@ services:
     ports:
       - 3000:3000
     volumes:
-      - ./grafana:/var/lib/grafana
+      - ./grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/
     container_name: grafana
     hostname: grafana

@@ -4,6 +4,7 @@ const path = require('path');
 
 const express = require('express');
 const expressSession = require('express-session');
+const ipaddr = require('ipaddr.js');
 const debug = require('debug')('Server');
 
 const Util = require('./Util');
@@ -47,16 +48,39 @@ module.exports = class Server {
         };
       }))
       .post('/api/session', Util.promisify(async req => {
+	const now = new Date();
+        const tZOffset = now.getTimezoneOffset()/60; 
+        const month = now.toLocaleString('en-US', { month: 'short' });
+        const day = now.getUTCDate();
+        const hours = now.getUTCHours()-tZOffset;
+        const minutes = now.getUTCMinutes();
+        const seconds = now.getUTCSeconds();
+	const datetimestr = `${month} ${day} ${hours}:${minutes}:${seconds} `
+	var ipString = req.headers['x-forwarded-for']?.split(',').shift() || req.socket?.remoteAddress
+	if (ipaddr.IPv4.isValid(ipString)) {
+		// ipString is IPv4
+	} else if (ipaddr.IPv6.isValid(ipString)) {
+		var ip = ipaddr.IPv6.parse(ipString);
+		if (ip.isIPv4MappedAddress()) {
+    		ipString = ip.toIPv4Address().toString()
+		} else {
+			// ipString is IPv6
+		}
+	} else {
+		// ipString is invalid
+	}
         const {
           password,
         } = req.body;
 
         if (typeof password !== 'string') {
-          throw new ServerError('Missing: Password', 401);
+	  console.log(datetimestr+"Missing password. HOST:"+ipString)
+          throw new ServerError('Missing: Password.', 401);
         }
 
         if (password !== PASSWORD) {
-          throw new ServerError('Incorrect Password', 401);
+	  console.log(datetimestr+"Incorrect password. HOST:"+ipString)
+          throw new ServerError('Incorrect Password.', 401);
         }
 
         req.session.authenticated = true;
