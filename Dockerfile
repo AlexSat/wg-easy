@@ -56,21 +56,16 @@ ADD https://github.com/just-containers/s6-overlay/releases/download/v${S6_OVERLA
 RUN tar -C / -Jxpf /tmp/s6-overlay-x86_64.tar.xz
 
 #Create s6-overlay configuration to run wireguard with ui and metrics exporter
+COPY s6-rc.d /etc/s6-overlay/s6-rc.d
+RUN mkdir -p /var/log/node_service
+RUN touch /var/log/node_service/current
+RUN chown -R nobody:nogroup /var/log
+VOLUME /var/log/
 
-RUN mkdir -p /etc/s6-overlay/s6-rc.d/node_server/dependencies.d
-RUN mkdir -p /etc/s6-overlay/s6-rc.d/metrics_exporter/dependencies.d
-RUN echo "longrun" > /etc/s6-overlay/s6-rc.d/metrics_exporter/type
-RUN echo "longrun" > /etc/s6-overlay/s6-rc.d/node_server/type
-COPY run_node_js /etc/s6-overlay/s6-rc.d/node_server/run
-RUN chmod +x /etc/s6-overlay/s6-rc.d/node_server/run && \
-    touch /etc/s6-overlay/s6-rc.d/node_server/dependencies.d/base
-COPY run_metrics /etc/s6-overlay/s6-rc.d/metrics_exporter/run
-RUN chmod +x /etc/s6-overlay/s6-rc.d/metrics_exporter/run && \
-    touch /etc/s6-overlay/s6-rc.d/metrics_exporter/dependencies.d/node_server && \
-    touch /etc/s6-overlay/s6-rc.d/metrics_exporter/dependencies.d/base
-RUN touch /etc/s6-overlay/s6-rc.d/user/contents.d/node_server && \
-    touch /etc/s6-overlay/s6-rc.d/user/contents.d/metrics_exporter
-    
+RUN \
+	chmod +x /etc/s6-overlay/s6-rc.d/node_service/run && \
+	chmod +x /etc/s6-overlay/s6-rc.d/metrics_exporter/run && \
+	chmod +x /etc/s6-overlay/s6-rc.d/node_service_logger/run
 
 # Expose Ports
 EXPOSE 51820/udp

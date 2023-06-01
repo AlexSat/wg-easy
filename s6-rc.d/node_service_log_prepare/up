@@ -1,0 +1,3 @@
+if { mkdir -p /var/log/node_service }
+if { chown nobody:nogroup /var/log/node_service }
+chmod 02755 /var/log/node_service
