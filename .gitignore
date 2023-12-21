@@ -1,3 +1,9 @@
 /config
 /wg0.conf
 /wg0.json
+pihole/
+prometheus_data/
+unbound_data/
+wireguard/
+.env
+!.env.example
