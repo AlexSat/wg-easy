@@ -1,20 +1,31 @@
 version: "3.8"
+
+networks:
+  wg-easy:
+    ipam:
+      config:
+        - subnet: ${LOCAL_SUBNET:-10.2.1.0/24}
+
 services:
-  wireguard_with_gui:
+  wireguard_with_gui_dns:
     image: wg-easy-with-metrics
-    container_name: wireguard_with_gui
+    container_name: wireguard_with_gui_dns
     ports:
-      - "51820:51820/udp"
+      - "${WGEASY_PORT:-51820}:51820/udp"
       - "51821:51821"
     restart: unless-stopped
-    hostname: wireguard
+    hostname: wireguard_dns
     user: root
+    networks:
+      wg-easy:
+        ipv4_address: ${WIREGUARD_SERVICE_IPV4_LOCAL_ADDRESS:-10.2.1.2}
     environment:
-      - WG_HOST=${WGEASY_SERVER_HOST:-192.168.0.10}
-      - PASSWORD=${WGEASY_ADMIN_PASSWORD:-p123123}
+      - WG_HOST=${WGEASY_SERVER_HOST:-10.2.1.2}
+      - PASSWORD=${WGEASY_ADMIN_PASSWORD:-admin123}
       - WG_PORT=${WGEASY_PORT:-51820}
       - WG_PERSISTENT_KEEPALIVE=30
-      - WG_DEFAULT_DNS=${WGEASY_DNS:-1.1.1.1}
+      - WG_DEFAULT_DNS=${PIHOLE_IPV4_LOCAL_ADDRESS:-10.2.1.3}
+      - WG_DEFAULT_ADDRESS=${WGEASY_SUBNET:-10.2.0.x}
     cap_add:
       - NET_ADMIN
       - SYS_MODULE
@@ -26,13 +37,44 @@ services:
       #To use this volume, you should create folder ./logs and make permissions 777 to it
       #- ./logs/:/var/log/
 
-  prometheus:
+  pihole_dns:
+    image: pihole/pihole
+    container_name: pihole_dns
+    environment:
+      - WEBPASSWORD=${PIHOLE_ADMIN_PASSWORD:-admin} # Web UI password
+      - ServerIP=${PIHOLE_IPV4_LOCAL_ADDRESS:-10.2.1.3} # Internal IP of pihole
+      - DNS1=${UNBOUND_IPV4_LOCAL_ADDRESS:-10.2.1.6} # Unbound IP
+      - DNS2=${UNBOUND_IPV4_LOCAL_ADDRESS:-10.2.1.6} # If we don't specify two, it will auto pick google.
+    dns:
+      - 127.0.0.1
+      - ${UNBOUND_IPV4_LOCAL_ADDRESS:-10.2.1.6} # Points to unbound
+    volumes:
+      - './pihole/etc-pihole:/etc/pihole'
+      - './pihole/etc-dnsmasq.d:/etc/dnsmasq.d'
+    restart: unless-stopped
+    networks:
+      wg-easy:
+        ipv4_address: ${PIHOLE_IPV4_LOCAL_ADDRESS:-10.2.1.3}
+
+  unbound_dns:
+    image: "mvance/unbound:latest"
+    container_name: unbound_dns
+    restart: unless-stopped
+    hostname: unbound_dns
+    volumes:
+      - "./unbound_data:/opt/unbound/etc/unbound/"
+      - "./unbound/unbound.conf:/opt/unbound/etc/unbound/unbound.conf"
+    networks:
+      wg-easy:
+        ipv4_address: ${UNBOUND_IPV4_LOCAL_ADDRESS:-10.2.1.6}
+
+  prometheus_dns:
     image: prom/prometheus:latest
     volumes:
       - ./prometheus:/etc/prometheus/
       - ./prometheus_data:/prometheus
-    container_name: prometheus
-    hostname: prometheus
+    container_name: prometheus_dns
+    hostname: prometheus_dns
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -43,25 +85,31 @@ services:
     #No need to open port of prometheus. It used internally by Grafana without auth.
     #ports:
     #  - 9090:9090
+    networks:
+      wg-easy:
+        ipv4_address: ${PROMETHEUS_IPV4_LOCAL_ADDRESS:-10.2.1.4}
     restart: unless-stopped
     environment:
-      TZ: "Europe/Moscow"
+      TZ: ${TZ:-UTC}
 
-  grafana:
+  grafana_dns:
     image: grafana/grafana
     user: root
     depends_on:
-      - prometheus
+      - prometheus_dns
     ports:
-      - 3000:3000
+      - 3003:3000
     volumes:
       - ./grafana_data:/var/lib/grafana
       - ./grafana/provisioning/:/etc/grafana/provisioning/
-    container_name: grafana
-    hostname: grafana
+    container_name: grafana_dns
+    hostname: grafana_dns
     restart: unless-stopped
+    networks:
+      wg-easy:
+        ipv4_address: ${GRAFANA_IPV4_LOCAL_ADDRESS:-10.2.1.5}
     environment:
-      - TZ="Europe/Moscow"
+      - TZ=${TZ:-UTC}
       - GF_SECURITY_ADMIN_USER=${WGEASY_GRAFANA_ADMIN_USERNAME:-admin}
       - GF_SECURITY_ADMIN_PASSWORD=${WGEASY_GRAFANA_ADMIN_PASSWORD:-admin}
       - GF_USERS_ALLOW_SIGN_UP=false
