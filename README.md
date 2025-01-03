@@ -1,3 +1,7 @@
+# Repository is archived
+
+Hard to support and fetch upstream updates -> moved to new generation 'all-in-one' https://github.com/AlexSat/wg-easy-behind-wstunnel
+
 # WireGuard Easy
 
 You have found the easiest way to install & manage WireGuard on any Linux host!
